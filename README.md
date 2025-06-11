@@ -2,6 +2,7 @@
 
 A web-based multiplayer platform featuring **Tic Tac Toe**, **Hangman**, and **Connect 4**, where players can create game rooms and invite friends via a link. The frontend is hosted on GitHub Pages, and the backend runs on Render with real-time communication powered by Socket.IO.
 
+# https://angelonol.github.io/mini-games-frontend/
 ---
 
 ## Features
