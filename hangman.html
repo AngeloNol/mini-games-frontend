@@ -3,13 +3,57 @@
 <head>
   <meta charset="UTF-8" />
   <title>Hangman</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #word {
+      font-size: 2rem;
+      letter-spacing: 0.3em;
+      margin: 20px 0;
+    }
+    #incorrectLetters {
+      margin: 10px;
+      color: red;
+      font-weight: bold;
+    }
+    #guessInput {
+      font-size: 1.2rem;
+      width: 50px;
+      text-transform: uppercase;
+    }
+    #canvas {
+      border: 1px solid #000;
+      margin-top: 20px;
+    }
+    #turnMessage {
+      font-weight: bold;
+      margin-top: 10px;
+      font-size: 1.2rem;
+    }
+  </style>
 </head>
 <body>
   <h1>Hangman</h1>
-  <div id="game"></div>
-  
+
+  <button id="createRoomBtn">Create Room</button>
+  <input id="roomInput" placeholder="Or enter room ID to join" />
+  <button id="joinRoomBtn">Join Room</button>
+
+  <div id="roomInfo"></div>
+
+  <div id="word">_ _ _ _ _</div>
+  <div>Incorrect Letters: <span id="incorrectLetters"></span></div>
+  <input type="text" id="guessInput" maxlength="1" />
+  <button id="guessBtn">Guess</button>
+
+  <canvas id="canvas" width="200" height="250"></canvas>
+
+  <div id="turnMessage"></div>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/socket-init.js"></script>
   <script src="js/hangman.js"></script>
 </body>
 </html>

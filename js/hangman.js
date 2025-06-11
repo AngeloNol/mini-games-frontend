@@ -1,180 +1,152 @@
-const socket = io("https://mini-games-backend.onrender.com");
+const socket = io("https://mini-games-backend.onrender.com"); // update URL accordingly
 
 let roomId = null;
-let playerNumber = null;
-let currentWord = "";
-let guessedLetters = new Set();
-let wrongGuesses = 0;
-let maxWrongGuesses = 6;
-let gameOver = false;
+let isPlayerTurn = false;
 
-const gameDiv = document.getElementById("game");
+const wordDiv = document.getElementById('word');
+const incorrectLettersSpan = document.getElementById('incorrectLetters');
+const guessInput = document.getElementById('guessInput');
+const guessBtn = document.getElementById('guessBtn');
+const turnMessage = document.getElementById('turnMessage');
+const roomInfo = document.getElementById('roomInfo');
+const createRoomBtn = document.getElementById('createRoomBtn');
+const joinRoomBtn = document.getElementById('joinRoomBtn');
+const roomInput = document.getElementById('roomInput');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 
-// Initial UI for create/join room
-function createInitialUI() {
-  gameDiv.innerHTML = "";
+let incorrectGuesses = 0;
+const maxIncorrect = 6;
 
-  const title = document.createElement("h2");
-  title.textContent = "Hangman - Multiplayer";
-  gameDiv.appendChild(title);
+// Drawing steps for the hangman figure
+function drawHangman(step) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const createBtn = document.createElement("button");
-  createBtn.textContent = "Create New Room";
-  createBtn.onclick = () => {
-    roomId = generateRoomId();
-    alert(`Room created! Share this ID: ${roomId}`);
-    joinRoom(roomId);
-  };
-  gameDiv.appendChild(createBtn);
+  // Gallows
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#000";
+  ctx.beginPath();
+  ctx.moveTo(10, 230);
+  ctx.lineTo(190, 230);
+  ctx.moveTo(40, 230);
+  ctx.lineTo(40, 20);
+  ctx.lineTo(120, 20);
+  ctx.lineTo(120, 40);
+  ctx.stroke();
 
-  const joinDiv = document.createElement("div");
-  joinDiv.style.marginTop = "10px";
-
-  const input = document.createElement("input");
-  input.placeholder = "Enter Room ID to Join";
-  input.style.marginRight = "10px";
-  joinDiv.appendChild(input);
-
-  const joinBtn = document.createElement("button");
-  joinBtn.textContent = "Join Room";
-  joinBtn.onclick = () => {
-    const id = input.value.trim();
-    if (!id) {
-      alert("Please enter a Room ID");
-      return;
-    }
-    joinRoom(id);
-  };
-  joinDiv.appendChild(joinBtn);
-
-  gameDiv.appendChild(joinDiv);
-}
-
-function generateRoomId() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "";
-  for (let i = 0; i < 6; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  if (step > 0) {
+    // Head
+    ctx.beginPath();
+    ctx.arc(120, 60, 20, 0, Math.PI * 2);
+    ctx.stroke();
   }
-  return id;
-}
-
-function joinRoom(id) {
-  roomId = id;
-  socket.emit("joinRoom", { game: "hangman", roomId });
-  createGameUI();
-}
-
-// Build the game UI after joining room
-function createGameUI() {
-  gameDiv.innerHTML = "";
-
-  const wordDiv = document.createElement("div");
-  wordDiv.id = "wordDisplay";
-  wordDiv.style.fontSize = "2em";
-  wordDiv.style.letterSpacing = "10px";
-  wordDiv.style.marginBottom = "20px";
-  gameDiv.appendChild(wordDiv);
-
-  const info = document.createElement("div");
-  info.id = "info";
-  info.style.marginBottom = "15px";
-  gameDiv.appendChild(info);
-
-  const guessedDiv = document.createElement("div");
-  guessedDiv.id = "guessedLetters";
-  guessedDiv.style.marginBottom = "20px";
-  gameDiv.appendChild(guessedDiv);
-
-  createKeyboard();
-
-  updateGameUI();
-}
-
-// Create clickable keyboard for guesses
-function createKeyboard() {
-  const keyboardDiv = document.createElement("div");
-  keyboardDiv.id = "keyboard";
-  keyboardDiv.style.display = "flex";
-  keyboardDiv.style.flexWrap = "wrap";
-  keyboardDiv.style.justifyContent = "center";
-  keyboardDiv.style.maxWidth = "400px";
-  keyboardDiv.style.margin = "auto";
-
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-  for (const letter of letters) {
-    const btn = document.createElement("button");
-    btn.textContent = letter;
-    btn.style.margin = "5px";
-    btn.style.width = "30px";
-
-    btn.onclick = () => {
-      if (gameOver || guessedLetters.has(letter)) return;
-      guessedLetters.add(letter);
-      socket.emit("hangmanGuess", { roomId, letter });
-    };
-    keyboardDiv.appendChild(btn);
+  if (step > 1) {
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(120, 80);
+    ctx.lineTo(120, 140);
+    ctx.stroke();
   }
-  gameDiv.appendChild(keyboardDiv);
+  if (step > 2) {
+    // Left arm
+    ctx.beginPath();
+    ctx.moveTo(120, 90);
+    ctx.lineTo(90, 120);
+    ctx.stroke();
+  }
+  if (step > 3) {
+    // Right arm
+    ctx.beginPath();
+    ctx.moveTo(120, 90);
+    ctx.lineTo(150, 120);
+    ctx.stroke();
+  }
+  if (step > 4) {
+    // Left leg
+    ctx.beginPath();
+    ctx.moveTo(120, 140);
+    ctx.lineTo(90, 180);
+    ctx.stroke();
+  }
+  if (step > 5) {
+    // Right leg
+    ctx.beginPath();
+    ctx.moveTo(120, 140);
+    ctx.lineTo(150, 180);
+    ctx.stroke();
+  }
 }
 
-function updateGameUI() {
-  const wordDiv = document.getElementById("wordDisplay");
-  const info = document.getElementById("info");
-  const guessedDiv = document.getElementById("guessedLetters");
-
-  if (!wordDiv || !info || !guessedDiv) return;
-
-  let displayWord = "";
-  for (const ch of currentWord) {
-    if (ch === " ") {
-      displayWord += "  ";
-    } else if (guessedLetters.has(ch.toUpperCase())) {
-      displayWord += ch + " ";
+function updateWordDisplay(word, guessedLetters) {
+  let display = '';
+  for (const letter of word) {
+    if (guessedLetters.includes(letter.toLowerCase())) {
+      display += letter.toUpperCase() + ' ';
     } else {
-      displayWord += "_ ";
+      display += '_ ';
     }
   }
-  wordDiv.textContent = displayWord.trim();
-
-  guessedDiv.textContent = "Guessed letters: " + Array.from(guessedLetters).join(", ");
-
-  info.textContent = gameOver ? "Game Over" : "Make a guess!";
+  wordDiv.textContent = display.trim();
 }
 
-// Socket listeners
-socket.on("hangmanInit", data => {
-  playerNumber = data.playerNumber;
-  currentWord = data.word.toUpperCase();
-  guessedLetters = new Set(data.guessedLetters.map(l => l.toUpperCase()));
-  wrongGuesses = data.wrongGuesses;
-  maxWrongGuesses = data.maxWrongGuesses;
-  gameOver = data.gameOver;
-  createGameUI();
-});
-
-socket.on("hangmanUpdate", data => {
-  currentWord = data.word.toUpperCase();
-  guessedLetters = new Set(data.guessedLetters.map(l => l.toUpperCase()));
-  wrongGuesses = data.wrongGuesses;
-  maxWrongGuesses = data.maxWrongGuesses;
-  gameOver = data.gameOver;
-  updateGameUI();
-});
-
-socket.on("hangmanError", data => {
-  alert(`Error: ${data.message}`);
-});
-
-window.onload = createInitialUI;
-
-// Optional: listen for keyboard input to guess letters
-window.addEventListener("keydown", e => {
-  if (gameOver) return;
-  const key = e.key.toUpperCase();
-  if (/^[A-Z]$/.test(key) && !guessedLetters.has(key)) {
-    guessedLetters.add(key);
-    socket.emit("hangmanGuess", { roomId, letter: key });
+guessBtn.onclick = () => {
+  const guess = guessInput.value.trim().toLowerCase();
+  if (!guess || guess.length !== 1 || !/[a-z]/.test(guess)) {
+    alert("Please enter a valid letter");
+    return;
   }
+  if (!isPlayerTurn) {
+    alert("Not your turn!");
+    return;
+  }
+  socket.emit('hangman-guess', { roomId, guess });
+  guessInput.value = '';
+};
+
+createRoomBtn.onclick = () => {
+  socket.emit('hangman-create-room');
+};
+
+joinRoomBtn.onclick = () => {
+  const inputRoom = roomInput.value.trim();
+  if (inputRoom) {
+    socket.emit('hangman-join-room', { roomId: inputRoom });
+  }
+};
+
+socket.on('hangman-room-created', (data) => {
+  roomId = data.roomId;
+  roomInfo.textContent = `Room created: ${roomId}`;
+  resetGame();
 });
+
+socket.on('hangman-room-joined', (data) => {
+  roomId = data.roomId;
+  roomInfo.textContent = `Joined room: ${roomId}`;
+  resetGame();
+});
+
+socket.on('hangman-error', (msg) => {
+  alert(msg);
+});
+
+socket.on('hangman-update', (data) => {
+  updateWordDisplay(data.word, data.guessedLetters);
+  incorrectLettersSpan.textContent = data.incorrectLetters.join(', ').toUpperCase();
+  incorrectGuesses = data.incorrectLetters.length;
+  drawHangman(incorrectGuesses);
+  isPlayerTurn = data.currentPlayer === socket.id;
+  turnMessage.textContent = isPlayerTurn ? "It's your turn!" : "Waiting for opponent...";
+});
+
+socket.on('hangman-game-over', (data) => {
+  alert(data.message);
+  turnMessage.textContent = "Game Over";
+});
+
+function resetGame() {
+  wordDiv.textContent = '';
+  incorrectLettersSpan.textContent = '';
+  drawHangman(0);
+  turnMessage.textContent = '';
+}

@@ -1,154 +1,103 @@
-const socket = io("https://mini-games-backend.onrender.com");
+const socket = io("https://mini-games-backend.onrender.com"); // Update with your backend URL
+
+const board = document.getElementById('board');
+const cells = document.querySelectorAll('.cell');
+const createRoomBtn = document.getElementById('createRoomBtn');
+const joinRoomBtn = document.getElementById('joinRoomBtn');
+const roomInput = document.getElementById('roomInput');
+const roomInfo = document.getElementById('roomInfo');
+const turnMessage = document.getElementById('turnMessage');
 
 let roomId = null;
-let playerNumber = null;
-let currentPlayerIndex = null;
-let board = [];
-let gameOver = false;
-let winner = null;
+let playerSymbol = null; // 'X' or 'O'
+let myTurn = false;
 
-const gameDiv = document.getElementById("game");
-
-// Show UI to create or join room on page load
-function createInitialUI() {
-  gameDiv.innerHTML = "";
-
-  const title = document.createElement("h2");
-  title.textContent = "Tic Tac Toe - Multiplayer";
-  gameDiv.appendChild(title);
-
-  // Create room button
-  const createBtn = document.createElement("button");
-  createBtn.textContent = "Create New Room";
-  createBtn.onclick = () => {
-    roomId = generateRoomId();
-    alert(`Room created! Share this ID: ${roomId}`);
-    joinRoom(roomId);
-  };
-  gameDiv.appendChild(createBtn);
-
-  // Join room input and button
-  const joinDiv = document.createElement("div");
-  joinDiv.style.marginTop = "10px";
-
-  const input = document.createElement("input");
-  input.placeholder = "Enter Room ID to Join";
-  input.style.marginRight = "10px";
-  joinDiv.appendChild(input);
-
-  const joinBtn = document.createElement("button");
-  joinBtn.textContent = "Join Room";
-  joinBtn.onclick = () => {
-    const id = input.value.trim();
-    if (!id) {
-      alert("Please enter a Room ID");
-      return;
-    }
-    joinRoom(id);
-  };
-  joinDiv.appendChild(joinBtn);
-
-  gameDiv.appendChild(joinDiv);
+// Clear board UI
+function clearBoard() {
+  cells.forEach(cell => {
+    cell.textContent = '';
+    cell.classList.remove('disabled');
+  });
 }
 
-function generateRoomId() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "";
-  for (let i = 0; i < 6; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
+// Disable all cells
+function disableBoard() {
+  cells.forEach(cell => cell.classList.add('disabled'));
+}
+
+// Update board UI with current state
+function updateBoard(boardState) {
+  boardState.forEach((cellVal, idx) => {
+    cells[idx].textContent = cellVal || '';
+    if (cellVal) cells[idx].classList.add('disabled');
+    else cells[idx].classList.remove('disabled');
+  });
+}
+
+function setTurnMessage(message) {
+  turnMessage.textContent = message;
+}
+
+createRoomBtn.addEventListener('click', () => {
+  socket.emit('tictactoe-create-room');
+});
+
+joinRoomBtn.addEventListener('click', () => {
+  const input = roomInput.value.trim();
+  if (input) {
+    socket.emit('tictactoe-join-room', { roomId: input });
   }
-  return id;
-}
+});
 
-function joinRoom(id) {
-  roomId = id;
-  socket.emit("joinRoom", { game: "tictactoe", roomId });
-  createBoard();
-}
+cells.forEach(cell => {
+  cell.addEventListener('click', () => {
+    if (!myTurn || cell.textContent !== '') return;
+    const index = cell.getAttribute('data-index');
+    socket.emit('tictactoe-make-move', { roomId, index: parseInt(index) });
+  });
+});
 
-// Build the 3x3 game board UI
-function createBoard() {
-  gameDiv.innerHTML = "";
+socket.on('tictactoe-room-created', (data) => {
+  roomId = data.roomId;
+  playerSymbol = 'X'; // Creator always 'X'
+  roomInfo.textContent = `Room created: ${roomId} (You are 'X')`;
+  clearBoard();
+  setTurnMessage("Your turn!");
+  myTurn = true;
+});
 
-  const boardEl = document.createElement("div");
-  boardEl.id = "board";
-  boardEl.style.display = "grid";
-  boardEl.style.gridTemplateColumns = "repeat(3, 100px)";
-  boardEl.style.gridGap = "5px";
-  boardEl.style.margin = "auto";
+socket.on('tictactoe-room-joined', (data) => {
+  roomId = data.roomId;
+  playerSymbol = 'O'; // Joiner is 'O'
+  roomInfo.textContent = `Joined room: ${roomId} (You are 'O')`;
+  clearBoard();
+  setTurnMessage("Opponent's turn...");
+  myTurn = false;
+});
 
-  for (let i = 0; i < 9; i++) {
-    const cell = document.createElement("div");
-    cell.classList.add("cell");
-    cell.dataset.index = i;
-    cell.style.width = "100px";
-    cell.style.height = "100px";
-    cell.style.border = "2px solid #333";
-    cell.style.display = "flex";
-    cell.style.justifyContent = "center";
-    cell.style.alignItems = "center";
-    cell.style.fontSize = "3em";
-    cell.style.cursor = "pointer";
-
-    cell.addEventListener("click", () => {
-      if (!gameOver && currentPlayerIndex === playerNumber && !board[i]) {
-        socket.emit("tictactoeMove", { roomId, index: i });
-      }
-    });
-
-    boardEl.appendChild(cell);
-  }
-
-  gameDiv.appendChild(boardEl);
-
-  const info = document.createElement("div");
-  info.id = "info";
-  info.style.marginTop = "15px";
-  gameDiv.appendChild(info);
-
-  updateBoardUI();
-}
-
-function updateBoardUI() {
-  const boardEl = document.getElementById("board");
-  if (!boardEl) return;
-
-  for (let i = 0; i < 9; i++) {
-    const cell = boardEl.querySelector(`[data-index="${i}"]`);
-    cell.textContent = board[i] === 0 ? "X" : board[i] === 1 ? "O" : "";
-  }
-
-  const info = document.getElementById("info");
-  if (gameOver) {
-    if (winner === null) info.textContent = "It's a tie!";
-    else if (winner === playerNumber) info.textContent = "You won! 🎉";
-    else info.textContent = `Player ${winner + 1} won.`;
+socket.on('tictactoe-update', (data) => {
+  updateBoard(data.board);
+  if (data.currentPlayer === socket.id) {
+    setTurnMessage("Your turn!");
+    myTurn = true;
   } else {
-    info.textContent = currentPlayerIndex === playerNumber ? "Your turn" : `Waiting for Player ${currentPlayerIndex + 1}`;
+    setTurnMessage("Opponent's turn...");
+    myTurn = false;
   }
-}
-
-// Socket event handlers
-
-socket.on("tictactoeInit", data => {
-  playerNumber = data.playerNumber;
-  currentPlayerIndex = data.currentPlayerIndex;
-  board = data.board;
-  gameOver = data.gameOver;
-  winner = data.winner;
-  createBoard();
 });
 
-socket.on("tictactoeUpdate", data => {
-  currentPlayerIndex = data.currentPlayerIndex;
-  board = data.board;
-  gameOver = data.gameOver;
-  winner = data.winner;
-  updateBoardUI();
+socket.on('tictactoe-game-over', (data) => {
+  updateBoard(data.board);
+  if (data.winner === playerSymbol) {
+    setTurnMessage("You win! 🎉");
+  } else if (data.winner === null) {
+    setTurnMessage("It's a tie!");
+  } else {
+    setTurnMessage("You lose!");
+  }
+  disableBoard();
 });
 
-socket.on("tictactoeError", data => {
-  alert(`Error: ${data.message}`);
+socket.on('tictactoe-error', (msg) => {
+  alert(msg);
 });
-
-window.onload = createInitialUI;

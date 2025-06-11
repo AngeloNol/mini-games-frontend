@@ -3,13 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <title>Tic Tac Toe</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    #roomControls {
+      margin-bottom: 20px;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 10px;
+      margin-bottom: 40px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      background-color: #fff;
+      padding: 15px;
+      border-radius: 10px;
+    }
+    .cell {
+      background-color: #e7eaf0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: bold;
+      color: #4a90e2;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      user-select: none;
+    }
+    .cell:hover {
+      background-color: #d1d9e6;
+    }
+    .cell.disabled {
+      cursor: default;
+      color: #888;
+    }
+    #turnMessage {
+      margin-top: auto; /* Push to bottom */
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #222;
+      padding: 10px 20px;
+      background: #4a90e2;
+      color: white;
+      border-radius: 25px;
+      box-shadow: 0 3px 8px rgba(74,144,226,0.5);
+      min-width: 180px;
+      text-align: center;
+      user-select: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #roomInput {
+      padding: 6px 10px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-right: 10px;
+    }
+    button {
+      font-size: 1rem;
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: none;
+      background-color: #4a90e2;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #357ABD;
+    }
+    #roomInfo {
+      margin-top: 10px;
+      font-weight: 600;
+      color: #555;
+    }
+  </style>
 </head>
 <body>
   <h1>Tic Tac Toe</h1>
-  <div id="game"></div>
-  
+
+  <div id="roomControls">
+    <button id="createRoomBtn">Create Room</button>
+    <input id="roomInput" placeholder="Enter room ID to join" />
+    <button id="joinRoomBtn">Join Room</button>
+    <div id="roomInfo"></div>
+  </div>
+
+  <div id="board">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
+
+  <div id="turnMessage">Waiting to start...</div>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/socket-init.js"></script>
   <script src="js/tictactoe.js"></script>
 </body>
 </html>

@@ -2,27 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Connect 4 Multiplayer</title>
+  <title>Connect 4</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <h1>Connect 4</h1>
+  
+  <label for="playerCount">Number of Players:</label>
+  <select id="playerCount">
+    <option value="2" selected>2 Players</option>
+    <option value="3">3 Players</option>
+    <option value="4">4 Players</option>
+  </select>
+  
+  <button id="createRoomBtn">Create Room</button>
+  <input id="roomInput" placeholder="Or enter room ID to join" />
+  <button id="joinRoomBtn">Join Room</button>
 
-  <div id="setup">
-    <label for="roomIdInput">Room ID:</label>
-    <input type="text" id="roomIdInput" placeholder="Enter or create room ID" />
-    <br />
-    <label for="playerCountSelect">Number of Players:</label>
-    <select id="playerCountSelect">
-      <option value="2" selected>2 Players</option>
-      <option value="3">3 Players</option>
-      <option value="4">4 Players</option>
-    </select>
-    <br />
-    <button id="joinBtn">Join Room</button>
-  </div>
+  <div id="game"></div>
 
-  <div id="game" style="display:none;"></div>
+  <div id="turnMessage" style="position: fixed; bottom: 10px; width: 100%; text-align: center; font-weight: bold;"></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/socket-init.js"></script>
