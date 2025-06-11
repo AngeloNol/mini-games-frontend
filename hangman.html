@@ -7,7 +7,11 @@
 </head>
 <body>
   <h1>Hangman</h1>
+  <button onclick="createRoom()">Create Room</button>
+  <input id="roomInput" placeholder="Enter Room ID">
+  <button onclick="joinRoom()">Join Room</button>
   <div id="game"></div>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/socket-init.js"></script>
   <script src="js/hangman.js"></script>

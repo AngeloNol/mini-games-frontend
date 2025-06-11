@@ -1,65 +1,29 @@
-const gameContainer = document.getElementById('game');
+const gameDiv = document.getElementById('game');
 let roomId = null;
-let currentWordDisplay = '';
-let guessesLeft = 6;
-let incorrectGuesses = [];
 
-function createSetupUI() {
-  // Same as before, omitted for brevity
-  // ...
+// Create a new room and emit to server
+function createRoom() {
+  roomId = Math.random().toString(36).substring(2, 8);
+  socket.emit('hangman-create', roomId);
+  alert(`Room created! Share this ID: ${roomId}`);
 }
 
-function renderWord() {
-  gameContainer.innerHTML = '';
-
-  const wordDiv = document.createElement('div');
-  wordDiv.style.fontSize = '2rem';
-  wordDiv.textContent = currentWordDisplay;
-  gameContainer.appendChild(wordDiv);
-
-  const guessesLeftDiv = document.createElement('div');
-  guessesLeftDiv.textContent = `Guesses Left: ${guessesLeft}`;
-  gameContainer.appendChild(guessesLeftDiv);
-
-  const incorrectDiv = document.createElement('div');
-  incorrectDiv.textContent = `Incorrect guesses: ${incorrectGuesses.join(', ')}`;
-  gameContainer.appendChild(incorrectDiv);
-
-  const instructions = document.createElement('p');
-  instructions.textContent = 'Type letters on your keyboard to guess.';
-  gameContainer.appendChild(instructions);
-}
-
-function setupKeyListener() {
-  window.addEventListener('keydown', (e) => {
-    const letter = e.key.toLowerCase();
-    if (letter.match(/^[a-z ]$/)) {
-      socket.emit('hangman-guess', { roomId, letter });
-    }
-  });
-}
-
-function startGame(category, customWord) {
-  roomId = prompt('Enter room ID for Hangman:');
-  if (!roomId) {
-    gameContainer.textContent = 'Room ID is required to play.';
-    return;
+// Join an existing room
+function joinRoom() {
+  const input = document.getElementById('roomInput');
+  roomId = input.value.trim();
+  if (roomId) {
+    socket.emit('hangman-join', roomId);
   }
-  socket.emit('hangman-join', { roomId, category, customWord });
-  setupKeyListener();
 }
 
-socket.on('hangman-update', ({ wordDisplay, guessesLeft: left, incorrectGuesses: wrong, status }) => {
-  currentWordDisplay = wordDisplay;
-  guessesLeft = left;
-  incorrectGuesses = wrong;
-  renderWord();
-
-  if (status === 'win') {
-    alert('Congratulations! You won!');
-  } else if (status === 'lose') {
-    alert('Game over! You lost.');
-  }
+// When server starts the game
+socket.on('hangman-start', () => {
+  gameDiv.innerHTML = `<p>Hangman game started in room: ${roomId}</p>`;
+  // Keyboard input and game UI logic will be added here
 });
 
-createSetupUI();
+// Error handling
+socket.on('hangman-error', (msg) => {
+  alert(msg);
+});
