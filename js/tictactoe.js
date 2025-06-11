@@ -1,4 +1,4 @@
-const socket = io("https://your-backend-url.onrender.com");
+const socket = io("https://mini-games-backend.onrender.com");
 
 let roomId = null;
 let playerNumber = null;
