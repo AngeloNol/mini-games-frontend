@@ -1,4 +1,4 @@
-const socket = io("https://your-backend.onrender.com");
+const socket = io("https://mini-games-backend.onrender.com");
 
 
 // File: frontend/js/tictactoe.js
