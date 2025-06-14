@@ -1,152 +1,183 @@
-const socket = io("https://mini-games-backend.onrender.com"); // update URL accordingly
+// js/hangman.js
+
+const socket = io("https://mini-games-backend.onrender.com"); // replace with your backend URL
+
+const createRoomBtn = document.getElementById("createRoomBtn");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const roomInput = document.getElementById("roomInput");
+const roomInfo = document.getElementById("roomInfo");
+
+const wordDiv = document.getElementById("word");
+const incorrectLettersSpan = document.getElementById("incorrectLetters");
+const guessInput = document.getElementById("guessInput");
+const guessBtn = document.getElementById("guessBtn");
+const turnMessage = document.getElementById("turnMessage");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
 let roomId = null;
-let isPlayerTurn = false;
+let gameActive = false;
 
-const wordDiv = document.getElementById('word');
-const incorrectLettersSpan = document.getElementById('incorrectLetters');
-const guessInput = document.getElementById('guessInput');
-const guessBtn = document.getElementById('guessBtn');
-const turnMessage = document.getElementById('turnMessage');
-const roomInfo = document.getElementById('roomInfo');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const roomInput = document.getElementById('roomInput');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-
-let incorrectGuesses = 0;
-const maxIncorrect = 6;
-
-// Drawing steps for the hangman figure
-function drawHangman(step) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Gallows
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#000";
-  ctx.beginPath();
-  ctx.moveTo(10, 230);
-  ctx.lineTo(190, 230);
-  ctx.moveTo(40, 230);
-  ctx.lineTo(40, 20);
-  ctx.lineTo(120, 20);
-  ctx.lineTo(120, 40);
-  ctx.stroke();
-
-  if (step > 0) {
-    // Head
+// Hangman drawing steps
+const drawSteps = [
+  () => { /* base */ 
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000';
     ctx.beginPath();
-    ctx.arc(120, 60, 20, 0, Math.PI * 2);
+    ctx.moveTo(10, 240);
+    ctx.lineTo(190, 240);
     ctx.stroke();
-  }
-  if (step > 1) {
-    // Body
+  },
+  () => { /* pole */
     ctx.beginPath();
-    ctx.moveTo(120, 80);
-    ctx.lineTo(120, 140);
+    ctx.moveTo(40, 240);
+    ctx.lineTo(40, 20);
     ctx.stroke();
-  }
-  if (step > 2) {
-    // Left arm
+  },
+  () => { /* beam */
     ctx.beginPath();
-    ctx.moveTo(120, 90);
-    ctx.lineTo(90, 120);
+    ctx.moveTo(40, 20);
+    ctx.lineTo(130, 20);
     ctx.stroke();
-  }
-  if (step > 3) {
-    // Right arm
+  },
+  () => { /* rope */
     ctx.beginPath();
-    ctx.moveTo(120, 90);
-    ctx.lineTo(150, 120);
+    ctx.moveTo(130, 20);
+    ctx.lineTo(130, 40);
     ctx.stroke();
-  }
-  if (step > 4) {
-    // Left leg
+  },
+  () => { /* head */
     ctx.beginPath();
-    ctx.moveTo(120, 140);
-    ctx.lineTo(90, 180);
+    ctx.arc(130, 60, 20, 0, Math.PI * 2);
     ctx.stroke();
-  }
-  if (step > 5) {
-    // Right leg
+  },
+  () => { /* body */
     ctx.beginPath();
-    ctx.moveTo(120, 140);
+    ctx.moveTo(130, 80);
+    ctx.lineTo(130, 140);
+    ctx.stroke();
+  },
+  () => { /* left arm */
+    ctx.beginPath();
+    ctx.moveTo(130, 100);
+    ctx.lineTo(100, 120);
+    ctx.stroke();
+  },
+  () => { /* right arm */
+    ctx.beginPath();
+    ctx.moveTo(130, 100);
+    ctx.lineTo(160, 120);
+    ctx.stroke();
+  },
+  () => { /* left leg */
+    ctx.beginPath();
+    ctx.moveTo(130, 140);
+    ctx.lineTo(110, 180);
+    ctx.stroke();
+  },
+  () => { /* right leg */
+    ctx.beginPath();
+    ctx.moveTo(130, 140);
     ctx.lineTo(150, 180);
     ctx.stroke();
+  },
+];
+
+// Draw hangman up to given step (number of incorrect guesses)
+function drawHangman(step) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < step && i < drawSteps.length; i++) {
+    drawSteps[i]();
   }
 }
 
-function updateWordDisplay(word, guessedLetters) {
-  let display = '';
-  for (const letter of word) {
-    if (guessedLetters.includes(letter.toLowerCase())) {
-      display += letter.toUpperCase() + ' ';
-    } else {
-      display += '_ ';
-    }
+// Create room
+createRoomBtn.addEventListener("click", () => {
+  socket.emit("createRoom", { game: "hangman" });
+});
+
+// Join room
+joinRoomBtn.addEventListener("click", () => {
+  const id = roomInput.value.trim();
+  if (!id) {
+    alert("Please enter a room ID");
+    return;
+  }
+  socket.emit("joinRoom", { game: "hangman", roomId: id });
+});
+
+// Guess letter
+guessBtn.addEventListener("click", () => {
+  const guess = guessInput.value.trim().toUpperCase();
+  if (!guess || guess.length !== 1 || !/[A-Z]/.test(guess)) {
+    alert("Please enter a valid letter");
+    guessInput.value = "";
+    return;
+  }
+  if (!gameActive || !roomId) {
+    alert("You must be in a game room to guess");
+    return;
+  }
+  socket.emit("guessLetter", { game: "hangman", roomId, letter: guess });
+  guessInput.value = "";
+});
+
+// Handle room created
+socket.on("roomCreated", ({ game, roomId: id }) => {
+  if (game !== "hangman") return;
+  roomId = id;
+  roomInfo.textContent = `Room ID: ${roomId}`;
+  turnMessage.textContent = "Waiting for opponent to join...";
+  resetGame();
+});
+
+// Handle room joined
+socket.on("roomJoined", ({ game, roomId: id }) => {
+  if (game !== "hangman") return;
+  roomId = id;
+  roomInfo.textContent = `Room ID: ${roomId}`;
+  turnMessage.textContent = "Game started! Make your guess.";
+  gameActive = true;
+  resetGame();
+});
+
+// Update word display
+socket.on("updateWord", ({ game, word, guessedLetters }) => {
+  if (game !== "hangman") return;
+  let display = "";
+  for (const char of word) {
+    display += guessedLetters.includes(char.toUpperCase()) ? char.toUpperCase() + " " : "_ ";
   }
   wordDiv.textContent = display.trim();
-}
+});
 
-guessBtn.onclick = () => {
-  const guess = guessInput.value.trim().toLowerCase();
-  if (!guess || guess.length !== 1 || !/[a-z]/.test(guess)) {
-    alert("Please enter a valid letter");
-    return;
+// Update incorrect letters and draw hangman
+socket.on("updateIncorrectLetters", ({ game, incorrectLetters }) => {
+  if (game !== "hangman") return;
+  incorrectLettersSpan.textContent = incorrectLetters.join(", ");
+  drawHangman(incorrectLetters.length);
+});
+
+// Handle game over
+socket.on("gameOver", ({ game, won, word }) => {
+  if (game !== "hangman") return;
+  gameActive = false;
+  if (won) {
+    turnMessage.textContent = "You won! 🎉";
+  } else {
+    turnMessage.textContent = `Game over! The word was: ${word}`;
   }
-  if (!isPlayerTurn) {
-    alert("Not your turn!");
-    return;
-  }
-  socket.emit('hangman-guess', { roomId, guess });
-  guessInput.value = '';
-};
-
-createRoomBtn.onclick = () => {
-  socket.emit('hangman-create-room');
-};
-
-joinRoomBtn.onclick = () => {
-  const inputRoom = roomInput.value.trim();
-  if (inputRoom) {
-    socket.emit('hangman-join-room', { roomId: inputRoom });
-  }
-};
-
-socket.on('hangman-room-created', (data) => {
-  roomId = data.roomId;
-  roomInfo.textContent = `Room created: ${roomId}`;
-  resetGame();
 });
 
-socket.on('hangman-room-joined', (data) => {
-  roomId = data.roomId;
-  roomInfo.textContent = `Joined room: ${roomId}`;
-  resetGame();
-});
-
-socket.on('hangman-error', (msg) => {
-  alert(msg);
-});
-
-socket.on('hangman-update', (data) => {
-  updateWordDisplay(data.word, data.guessedLetters);
-  incorrectLettersSpan.textContent = data.incorrectLetters.join(', ').toUpperCase();
-  incorrectGuesses = data.incorrectLetters.length;
-  drawHangman(incorrectGuesses);
-  isPlayerTurn = data.currentPlayer === socket.id;
-  turnMessage.textContent = isPlayerTurn ? "It's your turn!" : "Waiting for opponent...";
-});
-
-socket.on('hangman-game-over', (data) => {
-  alert(data.message);
-  turnMessage.textContent = "Game Over";
+// Handle turn message update (optional, if you want turn-based guessing)
+socket.on("turnMessage", ({ game, message }) => {
+  if (game !== "hangman") return;
+  turnMessage.textContent = message;
 });
 
 function resetGame() {
-  wordDiv.textContent = '';
-  incorrectLettersSpan.textContent = '';
+  wordDiv.textContent = "_ _ _ _ _";
+  incorrectLettersSpan.textContent = "";
   drawHangman(0);
-  turnMessage.textContent = '';
+  gameActive = false;
 }

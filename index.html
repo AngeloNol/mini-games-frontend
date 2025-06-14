@@ -1,16 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Mini Games Lobby</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <title>Multiplayer Mini Games Lobby</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      color: #222;
+      text-align: center;
+      margin: 0;
+      padding: 2em;
+    }
+    h1 {
+      margin-bottom: 1em;
+      font-weight: 700;
+    }
+    .game-list {
+      list-style: none;
+      padding: 0;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .game-list li {
+      background: #fff;
+      margin: 1em 0;
+      padding: 1em 2em;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .game-list li h2 {
+      margin: 0 0 0.5em 0;
+    }
+    button, input[type="text"] {
+      padding: 0.5em 1em;
+      font-size: 1em;
+      margin: 0.3em;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+      cursor: pointer;
+    }
+    input[type="text"] {
+      width: 150px;
+    }
+    #roomIdDisplay {
+      margin-top: 0.5em;
+      font-weight: 600;
+      color: #007bff;
+      user-select: all;
+    }
+  </style>
 </head>
 <body>
   <h1>Welcome to Multiplayer Mini Games</h1>
-  <ul>
-    <li><a href="tictactoe.html">Play Tic-Tac-Toe</a></li>
-    <li><a href="hangman.html">Play Hangman</a></li>
-    <li><a href="connect4.html">Play Connect 4</a></li>
+  <ul class="game-list">
+    <li>
+      <h2>Tic Tac Toe</h2>
+      <button onclick="createRoom('tictactoe')">Create Room</button>
+      <div>
+        <input type="text" id="joinRoomInput-tictactoe" placeholder="Enter room ID" />
+        <button onclick="joinRoom('tictactoe')">Join Room</button>
+      </div>
+      <div id="roomIdDisplay-tictactoe"></div>
+    </li>
+    <li>
+      <h2>Hangman</h2>
+      <button onclick="createRoom('hangman')">Create Room</button>
+      <div>
+        <input type="text" id="joinRoomInput-hangman" placeholder="Enter room ID" />
+        <button onclick="joinRoom('hangman')">Join Room</button>
+      </div>
+      <div id="roomIdDisplay-hangman"></div>
+    </li>
+    <li>
+      <h2>Connect 4</h2>
+      <button onclick="createRoom('connect4')">Create Room</button>
+      <div>
+        <input type="text" id="joinRoomInput-connect4" placeholder="Enter room ID" />
+        <button onclick="joinRoom('connect4')">Join Room</button>
+      </div>
+      <div id="roomIdDisplay-connect4"></div>
+    </li>
   </ul>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    // Connect to backend Socket.IO server - update with your backend URL
+    const socket = io("https://your-backend-url.onrender.com");
+
+    // Handle room created event from server
+    socket.on("roomCreated", ({ game, roomId }) => {
+      const display = document.getElementById(`roomIdDisplay-${game}`);
+      display.textContent = `Room created! Share this ID: ${roomId}`;
+    });
+
+    // Handle room join success - redirect to game page with roomId in URL
+    socket.on("roomJoined", ({ game, roomId }) => {
+      window.location.href = `${game}.html?roomId=${roomId}`;
+    });
+
+    // Handle errors from server
+    socket.on("errorMsg", ({ message }) => {
+      alert(message);
+    });
+
+    // Create room button handler
+    function createRoom(game) {
+      socket.emit("createRoom", { game });
+    }
+
+    // Join room button handler
+    function joinRoom(game) {
+      const input = document.getElementById(`joinRoomInput-${game}`);
+      const roomId = input.value.trim();
+      if (!roomId) {
+        alert("Please enter a valid room ID");
+        return;
+      }
+      socket.emit("joinRoom", { game, roomId });
+    }
+  </script>
 </body>
 </html>

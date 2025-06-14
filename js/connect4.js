@@ -1,153 +1,108 @@
-// Connect 4 frontend logic with room, player count, and falling disc animation
+const socket = io("https://mini-games-backend.onrender.com"); // replace with your actual backend URL
 
-const socket = io("https://mini-games-backend.onrender.com"); // change URL accordingly
-
-const ROWS = 6;
-const COLS = 7;
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const roomInput = document.getElementById("roomInput");
+const playerCountSelect = document.getElementById("playerCount");
+const turnMessage = document.getElementById("turnMessage");
+const gameDiv = document.getElementById("game");
 
 let roomId = null;
-let playerCount = 2;
-let board = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
-let players = [];
-let currentPlayerIndex = 0;
+let playerId = null;
+let currentTurn = null;
+let board = [];
+let columns = 7;
+let rows = 6;
 
-const gameDiv = document.getElementById('game');
-const turnMessage = document.getElementById('turnMessage');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const roomInput = document.getElementById('roomInput');
-const playerCountSelect = document.getElementById('playerCount');
+// Join Room Button
+joinRoomBtn.addEventListener("click", () => {
+  const room = roomInput.value.trim();
+  const numPlayers = parseInt(playerCountSelect.value);
 
-createRoomBtn.onclick = () => {
-  playerCount = parseInt(playerCountSelect.value);
-  socket.emit('connect4-create-room', { playerCount });
-};
-
-joinRoomBtn.onclick = () => {
-  const inputRoom = roomInput.value.trim();
-  if (inputRoom) {
-    socket.emit('connect4-join-room', { roomId: inputRoom });
-  }
-};
-
-socket.on('connect4-room-created', (data) => {
-  roomId = data.roomId;
-  alert(`Room created! Share this ID to join: ${roomId}`);
-  resetGame();
-});
-
-socket.on('connect4-room-joined', (data) => {
-  roomId = data.roomId;
-  resetGame();
-  alert(`Joined room: ${roomId}`);
-});
-
-socket.on('connect4-error', (msg) => {
-  alert(`Error: ${msg}`);
-});
-
-// Animate disc dropping into the row and column
-function animateDiscDrop(row, col, color) {
-  const boardEl = document.querySelector('.connect4-board');
-  if (!boardEl) return;
-  const rowEl = boardEl.children[row];
-  const cellEl = rowEl.children[col];
-
-  const disc = document.createElement('div');
-  disc.className = 'disc falling-disc';
-  disc.style.backgroundColor = color;
-  disc.style.top = '-50px';
-
-  cellEl.appendChild(disc);
-
-  requestAnimationFrame(() => {
-    disc.style.top = '0px';
-  });
-
-  disc.addEventListener('transitionend', () => {
-    disc.classList.remove('falling-disc');
-    disc.style.top = '';
-  });
-}
-
-function playMove(col) {
-  if (!roomId) {
-    alert("Join or create a room first!");
+  if (!room) {
+    alert("Enter a room ID");
     return;
   }
-  socket.emit('connect4-move', { roomId, col });
-}
 
-function renderBoard() {
-  gameDiv.innerHTML = '';
+  socket.emit("joinRoom", { game: "connect4", roomId: room, playerCount: numPlayers });
+});
 
-  const boardEl = document.createElement('div');
-  boardEl.className = 'connect4-board';
+// Socket listeners
+socket.on("roomJoined", ({ game, roomId: id, playerId: pid }) => {
+  if (game !== "connect4") return;
+  roomId = id;
+  playerId = pid;
+  turnMessage.textContent = `Joined room ${roomId}. Waiting for others...`;
+});
 
-  for (let r = 0; r < ROWS; r++) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'connect4-row';
-
-    for (let c = 0; c < COLS; c++) {
-      const cellEl = document.createElement('div');
-      cellEl.className = 'connect4-cell';
-
-      if (board[r][c] !== null) {
-        const disc = document.createElement('div');
-        disc.className = 'disc';
-        disc.style.backgroundColor = board[r][c];
-        cellEl.appendChild(disc);
-      }
-
-      cellEl.addEventListener('click', () => {
-        if (players[currentPlayerIndex] === socket.id) {
-          playMove(c);
-        }
-      });
-
-      rowEl.appendChild(cellEl);
-    }
-    boardEl.appendChild(rowEl);
-  }
-
-  gameDiv.appendChild(boardEl);
-}
-
-socket.on('connect4-update', (data) => {
-  if (board.length > 0) {
-    outer:
-    for (let r = ROWS - 1; r >= 0; r--) {
-      for (let c = 0; c < COLS; c++) {
-        if (board[r][c] !== data.board[r][c]) {
-          animateDiscDrop(r, c, data.board[r][c]);
-          break outer;
-        }
-      }
-    }
-  }
-
-  board = data.board;
-  players = data.players;
-  currentPlayerIndex = data.currentPlayerIndex;
-
+socket.on("gameStart", ({ board: b, currentTurn: ct }) => {
+  board = b;
+  currentTurn = ct;
   renderBoard();
+  updateTurnMessage();
+});
 
-  if (players[currentPlayerIndex] === socket.id) {
-    turnMessage.textContent = "It's your turn!";
+socket.on("gameUpdate", ({ board: b, currentTurn: ct }) => {
+  board = b;
+  currentTurn = ct;
+  renderBoard();
+  updateTurnMessage();
+});
+
+socket.on("gameOver", ({ winner }) => {
+  if (winner === null) {
+    turnMessage.textContent = "It's a draw!";
+  } else if (winner === playerId) {
+    turnMessage.textContent = "You win! 🎉";
   } else {
-    turnMessage.textContent = "Waiting for opponent...";
+    turnMessage.textContent = `Player ${winner + 1} wins!`;
   }
 });
 
-socket.on('connect4-game-over', (data) => {
-  alert(data.message);
-  turnMessage.textContent = "Game Over";
-});
+function updateTurnMessage() {
+  if (playerId === currentTurn) {
+    turnMessage.textContent = "Your turn!";
+  } else {
+    turnMessage.textContent = `Player ${currentTurn + 1}'s turn`;
+  }
+}
 
-function resetGame() {
-  board = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
-  players = [];
-  currentPlayerIndex = 0;
-  renderBoard();
-  turnMessage.textContent = '';
+// Render the Connect 4 board
+function renderBoard() {
+  gameDiv.innerHTML = "";
+  const table = document.createElement("table");
+  table.style.borderCollapse = "collapse";
+  table.style.margin = "auto";
+
+  for (let r = 0; r < rows; r++) {
+    const row = document.createElement("tr");
+
+    for (let c = 0; c < columns; c++) {
+      const cell = document.createElement("td");
+      cell.dataset.col = c;
+      cell.style.width = "60px";
+      cell.style.height = "60px";
+      cell.style.border = "2px solid #555";
+      cell.style.borderRadius = "50%";
+      cell.style.backgroundColor = getColor(board[r][c]);
+      cell.style.cursor = "pointer";
+
+      if (r === 0) {
+        cell.addEventListener("click", () => {
+          if (playerId !== currentTurn) return;
+          socket.emit("makeMove", { game: "connect4", roomId, column: c });
+        });
+      }
+
+      row.appendChild(cell);
+    }
+
+    table.appendChild(row);
+  }
+
+  gameDiv.appendChild(table);
+}
+
+function getColor(val) {
+  const colors = ["#e7eaf0", "#ff4d4d", "#4da6ff", "#32cd32", "#ffcc00"];
+  return colors[val] || "#ccc";
 }
