@@ -1,100 +1,67 @@
-// js/tictactoe.js
+// Get roomId from URL
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get("roomId");
 
-const socket = io("https://mini-games-backend.onrender.com"); // Replace with your backend URL
+const gameBoard = document.getElementById("gameBoard");
+const gameStatus = document.getElementById("gameStatus");
 
-const board = document.getElementById("board");
-const cells = Array.from(document.querySelectorAll(".cell"));
-const turnMessage = document.getElementById("turnMessage");
-const roomInfo = document.getElementById("roomInfo");
+let board = Array(9).fill(null);
+let currentPlayer = null;
+let mySymbol = null;
+let isMyTurn = false;
 
-const createRoomBtn = document.getElementById("createRoomBtn");
-const joinRoomBtn = document.getElementById("joinRoomBtn");
-const roomInput = document.getElementById("roomInput");
-
-let roomId = null;
-let playerSymbol = null; // "X" or "O"
-let myTurn = false;
-let gameActive = false;
-
-// Create room handler
-createRoomBtn.addEventListener("click", () => {
-  socket.emit("createRoom", { game: "tictactoe" });
-});
-
-// Join room handler
-joinRoomBtn.addEventListener("click", () => {
-  const id = roomInput.value.trim();
-  if (!id) {
-    alert("Please enter a valid room ID");
-    return;
-  }
-  socket.emit("joinRoom", { game: "tictactoe", roomId: id });
-});
-
-// When room is created
-socket.on("roomCreated", ({ game, roomId: id }) => {
-  if (game !== "tictactoe") return;
-  roomId = id;
-  roomInfo.textContent = `Room ID: ${roomId}`;
-  turnMessage.textContent = "Waiting for opponent to join...";
-  resetBoard();
-});
-
-// When successfully joined a room
-socket.on("roomJoined", ({ game, roomId: id, symbol }) => {
-  if (game !== "tictactoe") return;
-  roomId = id;
-  playerSymbol = symbol; // assigned by server: "X" or "O"
-  roomInfo.textContent = `Room ID: ${roomId} | You are "${playerSymbol}"`;
-  turnMessage.textContent = playerSymbol === "X" ? "Your turn" : "Opponent's turn";
-  gameActive = true;
-  myTurn = playerSymbol === "X";
-  resetBoard();
-});
-
-// When opponent makes a move
-socket.on("moveMade", ({ game, index, symbol }) => {
-  if (game !== "tictactoe" || !gameActive) return;
-  cells[index].textContent = symbol;
-  cells[index].classList.add("disabled");
-
-  if (symbol !== playerSymbol) {
-    myTurn = true;
-    turnMessage.textContent = "Your turn";
-  } else {
-    myTurn = false;
-    turnMessage.textContent = "Opponent's turn";
-  }
-});
-
-// When game ends (win or draw)
-socket.on("gameOver", ({ game, winner }) => {
-  if (game !== "tictactoe") return;
-  gameActive = false;
-  if (winner === playerSymbol) {
-    turnMessage.textContent = "You win! 🎉";
-  } else if (winner === null) {
-    turnMessage.textContent = "Draw game!";
-  } else {
-    turnMessage.textContent = "You lose!";
-  }
-});
-
-// Cell click handler
-cells.forEach((cell) => {
-  cell.addEventListener("click", () => {
-    if (!gameActive) return;
-    if (!myTurn) return;
-    if (cell.textContent !== "") return;
-
-    const index = parseInt(cell.getAttribute("data-index"));
-    socket.emit("makeMove", { game: "tictactoe", roomId, index });
-  });
-});
-
-function resetBoard() {
-  cells.forEach(cell => {
-    cell.textContent = "";
-    cell.classList.remove("disabled");
+// Generate game board UI
+function renderBoard() {
+  gameBoard.innerHTML = "";
+  board.forEach((cell, index) => {
+    const div = document.createElement("div");
+    div.classList.add("cell");
+    div.textContent = cell || "";
+    div.addEventListener("click", () => makeMove(index));
+    gameBoard.appendChild(div);
   });
 }
+
+// Make move
+function makeMove(index) {
+  if (!isMyTurn || board[index]) return;
+
+  board[index] = mySymbol;
+  renderBoard();
+  socket.emit("tictactoeMove", { roomId, index });
+  isMyTurn = false;
+  updateStatus("Waiting for opponent...");
+}
+
+// Update game status message
+function updateStatus(message) {
+  gameStatus.textContent = message;
+}
+
+// Socket events
+socket.emit("joinRoom", { game: "tictactoe", roomId });
+
+socket.on("tictactoeStart", ({ symbol, firstTurn }) => {
+  mySymbol = symbol;
+  isMyTurn = symbol === firstTurn;
+  updateStatus(isMyTurn ? "Your turn!" : "Opponent's turn...");
+  renderBoard();
+});
+
+socket.on("tictactoeMove", ({ index, symbol }) => {
+  board[index] = symbol;
+  renderBoard();
+  if (checkWin(symbol)) {
+    updateStatus(symbol === mySymbol ? "You win!" : "You lose!");
+    isMyTurn = false;
+  } else if (board.every(cell => cell)) {
+    updateStatus("It's a draw!");
+  } else {
+    isMyTurn = true;
+    updateStatus("Your turn!");
+  }
+});
+
+socket.on("errorMsg", ({ message }) => {
+  alert(message);
+});
