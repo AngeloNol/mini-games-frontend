@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Multiplayer Mini Games Lobby</title>
-  <link rel="stylesheet" href="css/styles.css" />
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -95,31 +94,28 @@
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    // Connect to backend Socket.IO server - update with your backend URL
     const socket = io("https://mini-games-backend.onrender.com");
 
-    // Handle room created event from server
     socket.on("roomCreated", ({ game, roomId }) => {
+      console.log("Room created:", game, roomId);
       const display = document.getElementById(`roomIdDisplay-${game}`);
-      display.textContent = `Room created! Share this ID: ${roomId}`;
+      if (display) {
+        display.textContent = `Room created! Share this ID: ${roomId}`;
+      }
     });
 
-    // Handle room join success - redirect to game page with roomId in URL
     socket.on("roomJoined", ({ game, roomId }) => {
       window.location.href = `${game}.html?roomId=${roomId}`;
     });
 
-    // Handle errors from server
     socket.on("errorMsg", ({ message }) => {
       alert(message);
     });
 
-    // Create room button handler
     function createRoom(game) {
       socket.emit("createRoom", { game });
     }
 
-    // Join room button handler
     function joinRoom(game) {
       const input = document.getElementById(`joinRoomInput-${game}`);
       const roomId = input.value.trim();
