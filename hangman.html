@@ -2,56 +2,152 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Hangman</title>
+  <title>Multiplayer Hangman</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      background: #f4f6f9;
       text-align: center;
+      padding: 2em;
     }
-    #word {
-      font-size: 2rem;
-      letter-spacing: 0.3em;
-      margin: 20px 0;
+    canvas {
+      border: 2px solid #333;
+      background: #fff;
+      margin: 1em auto;
     }
-    #incorrectLetters {
-      margin: 10px;
-      color: red;
-      font-weight: bold;
+    #wordDisplay {
+      font-size: 2em;
+      letter-spacing: 0.2em;
+      margin: 1em 0;
     }
-    #guessInput {
-      font-size: 1.2rem;
-      width: 50px;
-      text-transform: uppercase;
+    #guessedLetters {
+      margin: 1em 0;
     }
-    #canvas {
-      border: 1px solid #000;
-      margin-top: 20px;
+    #guessedLetters span {
+      display: inline-block;
+      margin: 0.3em;
+      padding: 0.5em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
-    #turnMessage {
-      font-weight: bold;
-      margin-top: 10px;
-      font-size: 1.2rem;
+    #setWordContainer {
+      margin-bottom: 1em;
+    }
+    input[type="text"] {
+      padding: 0.5em;
+      font-size: 1em;
+      width: 300px;
+    }
+    button {
+      padding: 0.5em 1em;
+      font-size: 1em;
+      margin-top: 0.5em;
     }
   </style>
 </head>
 <body>
-  <h1>Hangman</h1>
+  <h1>Multiplayer Hangman</h1>
+  <div id="setWordContainer">
+    <p>Set a word or sentence for your opponent to guess:</p>
+    <input type="text" id="customWordInput" placeholder="Enter word or sentence..." />
+    <button id="submitWordBtn">Submit Word</button>
+  </div>
 
-
-
-  <div id="roomInfo"></div>
-
-  <div id="word">_ _ _ _ _</div>
-  <div>Incorrect Letters: <span id="incorrectLetters"></span></div>
-  <input type="text" id="guessInput" maxlength="1" />
-  <button id="guessBtn">Guess</button>
-
-  <canvas id="canvas" width="200" height="250"></canvas>
-
-  <div id="turnMessage"></div>
+  <div id="gameArea" style="display: none;">
+    <canvas id="hangmanCanvas" width="300" height="300"></canvas>
+    <div id="wordDisplay"></div>
+    <div id="guessedLetters"></div>
+    <p>Use your keyboard to guess letters.</p>
+  </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="js/socket-init.js"></script>
-  <script src="js/hangman.js"></script>
+  <script>
+    const socket = io("https://mini-games-backend.onrender.com");
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get("roomId");
+
+    let isWordSetter = false;
+    let wordSet = false;
+    const canvas = document.getElementById("hangmanCanvas");
+    const ctx = canvas.getContext("2d");
+    let wrongGuesses = 0;
+    const maxGuesses = 6;
+    let guessed = [];
+
+    const parts = [
+      () => ctx.beginPath() || ctx.arc(150, 60, 20, 0, Math.PI * 2) || ctx.stroke(),           // Head
+      () => ctx.beginPath() || ctx.moveTo(150, 80) || ctx.lineTo(150, 140) || ctx.stroke(),   // Body
+      () => ctx.beginPath() || ctx.moveTo(150, 100) || ctx.lineTo(120, 120) || ctx.stroke(),  // Left Arm
+      () => ctx.beginPath() || ctx.moveTo(150, 100) || ctx.lineTo(180, 120) || ctx.stroke(),  // Right Arm
+      () => ctx.beginPath() || ctx.moveTo(150, 140) || ctx.lineTo(130, 180) || ctx.stroke(),  // Left Leg
+      () => ctx.beginPath() || ctx.moveTo(150, 140) || ctx.lineTo(170, 180) || ctx.stroke()   // Right Leg
+    ];
+
+    function drawScaffold() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.moveTo(20, 280); ctx.lineTo(280, 280); // Base
+      ctx.moveTo(100, 280); ctx.lineTo(100, 20); // Pole
+      ctx.lineTo(150, 20); ctx.lineTo(150, 40);  // Top + rope
+      ctx.stroke();
+    }
+
+    function updateWordDisplay(maskedWord) {
+      document.getElementById("wordDisplay").textContent = maskedWord;
+    }
+
+    function updateGuessedLetters() {
+      const div = document.getElementById("guessedLetters");
+      div.innerHTML = "";
+      guessed.forEach(letter => {
+        const span = document.createElement("span");
+        span.textContent = letter.toUpperCase();
+        div.appendChild(span);
+      });
+    }
+
+    function handleKey(e) {
+      if (!/^[a-zA-Z]$/.test(e.key) || guessed.includes(e.key.toLowerCase())) return;
+      guessed.push(e.key.toLowerCase());
+      socket.emit("guessLetter", { roomId, letter: e.key.toLowerCase() });
+      updateGuessedLetters();
+    }
+
+    document.getElementById("submitWordBtn").addEventListener("click", () => {
+      const word = document.getElementById("customWordInput").value.trim();
+      if (!word) return alert("Enter a valid word.");
+      socket.emit("setWord", { roomId, word });
+      isWordSetter = true;
+      document.getElementById("setWordContainer").style.display = "none";
+      document.getElementById("gameArea").style.display = "block";
+      drawScaffold();
+    });
+
+    socket.emit("joinRoom", { game: "hangman", roomId });
+
+    socket.on("startGame", ({ maskedWord }) => {
+      wordSet = true;
+      drawScaffold();
+      updateWordDisplay(maskedWord);
+      document.getElementById("setWordContainer").style.display = "none";
+      document.getElementById("gameArea").style.display = "block";
+    });
+
+    socket.on("updateMaskedWord", ({ maskedWord, correct }) => {
+      updateWordDisplay(maskedWord);
+      if (!correct) {
+        if (wrongGuesses < maxGuesses) {
+          parts[wrongGuesses++]();
+        }
+      }
+    });
+
+    socket.on("gameOver", ({ win, word }) => {
+      window.removeEventListener("keydown", handleKey);
+      alert(win ? "You won!" : `You lost! The word was: ${word}`);
+    });
+
+    window.addEventListener("keydown", handleKey);
+  </script>
 </body>
 </html>

@@ -19,7 +19,7 @@
     .game-list {
       list-style: none;
       padding: 0;
-      max-width: 400px;
+      max-width: 500px;
       margin: 0 auto;
     }
     .game-list li {
@@ -35,7 +35,7 @@
     .game-list li h2 {
       margin: 0 0 0.5em 0;
     }
-    button, input[type="text"] {
+    button, input[type="text"], select {
       padding: 0.5em 1em;
       font-size: 1em;
       margin: 0.3em;
@@ -50,7 +50,7 @@
       cursor: pointer;
     }
     input[type="text"] {
-      width: 150px;
+      width: 180px;
     }
     #roomIdDisplay {
       margin-top: 0.5em;
@@ -63,6 +63,8 @@
 <body>
   <h1>Welcome to Multiplayer Mini Games</h1>
   <ul class="game-list">
+
+    <!-- Tic Tac Toe -->
     <li>
       <h2>Tic Tac Toe</h2>
       <button onclick="createRoom('tictactoe')">Create Room</button>
@@ -72,15 +74,27 @@
       </div>
       <div id="roomIdDisplay-tictactoe"></div>
     </li>
+
+    <!-- Hangman -->
     <li>
       <h2>Hangman</h2>
-      <button onclick="createRoom('hangman')">Create Room</button>
+      <div>
+        <input type="text" id="customWordInput-hangman" placeholder="Enter word or sentence" />
+        <select id="playerCountSelect-hangman">
+          <option value="2">2 Players</option>
+          <option value="3">3 Players</option>
+          <option value="4">4 Players</option>
+        </select>
+        <button onclick="createRoom('hangman')">Create Room</button>
+      </div>
       <div>
         <input type="text" id="joinRoomInput-hangman" placeholder="Enter room ID" />
         <button onclick="joinRoom('hangman')">Join Room</button>
       </div>
       <div id="roomIdDisplay-hangman"></div>
     </li>
+
+    <!-- Connect 4 -->
     <li>
       <h2>Connect 4</h2>
       <button onclick="createRoom('connect4')">Create Room</button>
@@ -97,7 +111,6 @@
     const socket = io("https://mini-games-backend.onrender.com");
 
     socket.on("roomCreated", ({ game, roomId }) => {
-      console.log("Room created:", game, roomId);
       const display = document.getElementById(`roomIdDisplay-${game}`);
       if (display) {
         display.textContent = `Room created! Share this ID: ${roomId}`;
@@ -113,7 +126,16 @@
     });
 
     function createRoom(game) {
-      socket.emit("createRoom", { game });
+      const wordInput = document.getElementById(`customWordInput-${game}`);
+      const playerCountSelect = document.getElementById(`playerCountSelect-${game}`);
+      const customWord = wordInput ? wordInput.value.trim() : "";
+      const playerCount = playerCountSelect ? parseInt(playerCountSelect.value) : 2;
+
+      socket.emit("createRoom", {
+        game,
+        word: customWord,
+        players: playerCount
+      });
     }
 
     function joinRoom(game) {
