@@ -1,67 +1,60 @@
-// Get roomId from URL
+const socket = io("https://mini-games-backend.onrender.com");
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get("roomId");
 
-const gameBoard = document.getElementById("gameBoard");
-const gameStatus = document.getElementById("gameStatus");
+let symbol = null;
+let myTurn = false;
 
-let board = Array(9).fill(null);
-let currentPlayer = null;
-let mySymbol = null;
-let isMyTurn = false;
+const cells = document.querySelectorAll(".cell");
+const statusDiv = document.getElementById("status");
+const board = Array(9).fill(null);
 
-// Generate game board UI
-function renderBoard() {
-  gameBoard.innerHTML = "";
-  board.forEach((cell, index) => {
-    const div = document.createElement("div");
-    div.classList.add("cell");
-    div.textContent = cell || "";
-    div.addEventListener("click", () => makeMove(index));
-    gameBoard.appendChild(div);
-  });
-}
-
-// Make move
-function makeMove(index) {
-  if (!isMyTurn || board[index]) return;
-
-  board[index] = mySymbol;
-  renderBoard();
-  socket.emit("tictactoeMove", { roomId, index });
-  isMyTurn = false;
-  updateStatus("Waiting for opponent...");
-}
-
-// Update game status message
-function updateStatus(message) {
-  gameStatus.textContent = message;
-}
-
-// Socket events
 socket.emit("joinRoom", { game: "tictactoe", roomId });
 
-socket.on("tictactoeStart", ({ symbol, firstTurn }) => {
-  mySymbol = symbol;
-  isMyTurn = symbol === firstTurn;
-  updateStatus(isMyTurn ? "Your turn!" : "Opponent's turn...");
-  renderBoard();
+socket.on("startGame", (data) => {
+  symbol = data.symbol;
+  myTurn = symbol === "X";
+  updateStatus(`Game started! You are ${symbol}. ${myTurn ? "Your turn." : "Waiting for opponent..."}`);
 });
 
-socket.on("tictactoeMove", ({ index, symbol }) => {
-  board[index] = symbol;
-  renderBoard();
-  if (checkWin(symbol)) {
-    updateStatus(symbol === mySymbol ? "You win!" : "You lose!");
-    isMyTurn = false;
-  } else if (board.every(cell => cell)) {
-    updateStatus("It's a draw!");
+socket.on("moveMade", ({ index, symbol: moveSymbol, board: newBoard }) => {
+  board[index] = moveSymbol;
+  cells[index].textContent = moveSymbol;
+  myTurn = (symbol !== moveSymbol); // It's my turn if opponent just moved
+  updateStatus(myTurn ? "Your turn." : "Opponent's turn.");
+});
+
+socket.on("gameOver", ({ winner }) => {
+  if (winner) {
+    updateStatus(winner === symbol ? "You win!" : "You lose.");
   } else {
-    isMyTurn = true;
-    updateStatus("Your turn!");
+    updateStatus("It's a draw!");
   }
+  disableBoard();
 });
 
-socket.on("errorMsg", ({ message }) => {
-  alert(message);
+socket.on("opponentDisconnected", () => {
+  updateStatus("Opponent disconnected.");
+  disableBoard();
 });
+
+function handleClick(e) {
+  const index = parseInt(e.target.dataset.index);
+  if (!myTurn || board[index]) return;
+
+  socket.emit("makeMove", { index });
+}
+
+cells.forEach((cell) => {
+  cell.addEventListener("click", handleClick);
+});
+
+function updateStatus(message) {
+  statusDiv.textContent = message;
+}
+
+function disableBoard() {
+  cells.forEach((cell) => {
+    cell.removeEventListener("click", handleClick);
+  });
+}
