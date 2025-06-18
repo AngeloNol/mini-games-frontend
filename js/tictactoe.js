@@ -1,5 +1,5 @@
 // Connect to Socket.io server
-const socket = io();
+const socket = io("https://mini-games-backend.onrender.com");
 
 // UI elements
 const statusText = document.getElementById("status");
