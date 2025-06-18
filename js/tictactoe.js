@@ -1,60 +1,57 @@
 const socket = io("https://mini-games-backend.onrender.com");
+
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get("roomId");
 
-let symbol = null;
-let myTurn = false;
+let currentPlayer = null;
+let board = Array(9).fill(null);
+let isMyTurn = false;
 
+// DOM Elements
+const statusText = document.getElementById("status");
 const cells = document.querySelectorAll(".cell");
-const statusDiv = document.getElementById("status");
-const board = Array(9).fill(null);
 
+// Join room
 socket.emit("joinRoom", { game: "tictactoe", roomId });
 
-socket.on("startGame", (data) => {
-  symbol = data.symbol;
-  myTurn = symbol === "X";
-  updateStatus(`Game started! You are ${symbol}. ${myTurn ? "Your turn." : "Waiting for opponent..."}`);
+socket.on("startGame", (symbol) => {
+  currentPlayer = symbol;
+  isMyTurn = symbol === "X";
+  statusText.textContent = isMyTurn ? "Your turn (You are X)" : "Waiting for opponent...";
 });
 
-socket.on("moveMade", ({ index, symbol: moveSymbol, board: newBoard }) => {
-  board[index] = moveSymbol;
-  cells[index].textContent = moveSymbol;
-  myTurn = (symbol !== moveSymbol); // It's my turn if opponent just moved
-  updateStatus(myTurn ? "Your turn." : "Opponent's turn.");
+socket.on("updateBoard", ({ board: newBoard, nextTurn }) => {
+  board = newBoard;
+  updateUI();
+  isMyTurn = nextTurn === currentPlayer;
+  statusText.textContent = isMyTurn ? "Your turn" : "Opponent's turn";
 });
 
 socket.on("gameOver", ({ winner }) => {
-  if (winner) {
-    updateStatus(winner === symbol ? "You win!" : "You lose.");
+  if (winner === currentPlayer) {
+    statusText.textContent = "You win!";
+  } else if (winner === "draw") {
+    statusText.textContent = "It's a draw!";
   } else {
-    updateStatus("It's a draw!");
+    statusText.textContent = "You lose!";
   }
-  disableBoard();
+  isMyTurn = false;
 });
 
 socket.on("opponentDisconnected", () => {
-  updateStatus("Opponent disconnected.");
-  disableBoard();
+  statusText.textContent = "Opponent disconnected.";
+  isMyTurn = false;
 });
 
-function handleClick(e) {
-  const index = parseInt(e.target.dataset.index);
-  if (!myTurn || board[index]) return;
-
-  socket.emit("makeMove", { index });
-}
-
-cells.forEach((cell) => {
-  cell.addEventListener("click", handleClick);
+cells.forEach((cell, index) => {
+  cell.addEventListener("click", () => {
+    if (!isMyTurn || board[index]) return;
+    socket.emit("makeMove", { roomId, index });
+  });
 });
 
-function updateStatus(message) {
-  statusDiv.textContent = message;
-}
-
-function disableBoard() {
-  cells.forEach((cell) => {
-    cell.removeEventListener("click", handleClick);
+function updateUI() {
+  board.forEach((value, index) => {
+    cells[index].textContent = value || "";
   });
 }
