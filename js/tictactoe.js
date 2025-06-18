@@ -11,38 +11,38 @@ let isMyTurn = false;
 const statusText = document.getElementById("status");
 const cells = document.querySelectorAll(".cell");
 
-// Join room
+// Emit joinRoom event
 socket.emit("joinRoom", { game: "tictactoe", roomId });
 
-socket.on("startGame", (symbol) => {
+// Handle game start
+socket.on("startGame", ({ symbol, turn }) => {
   currentPlayer = symbol;
-  isMyTurn = symbol === "X";
-  statusText.textContent = isMyTurn ? "Your turn (You are X)" : "Waiting for opponent...";
+  isMyTurn = turn;
+  statusText.textContent = isMyTurn
+    ? `Your turn (You are ${currentPlayer})`
+    : `Opponent's turn (You are ${currentPlayer})`;
 });
 
+// Handle board updates
 socket.on("updateBoard", ({ board: newBoard, nextTurn }) => {
   board = newBoard;
-  updateUI();
-  isMyTurn = nextTurn === currentPlayer;
+  updateBoardUI();
+  isMyTurn = (nextTurn === (currentPlayer === "X" ? 0 : 1));
   statusText.textContent = isMyTurn ? "Your turn" : "Opponent's turn";
 });
 
-socket.on("gameOver", ({ winner }) => {
-  if (winner === currentPlayer) {
-    statusText.textContent = "You win!";
-  } else if (winner === "draw") {
-    statusText.textContent = "It's a draw!";
-  } else {
-    statusText.textContent = "You lose!";
-  }
-  isMyTurn = false;
-});
-
+// Handle opponent disconnect
 socket.on("opponentDisconnected", () => {
   statusText.textContent = "Opponent disconnected.";
   isMyTurn = false;
 });
 
+// Handle waiting message
+socket.on("waitingForOpponent", () => {
+  statusText.textContent = "Waiting for opponent...";
+});
+
+// Handle move clicks
 cells.forEach((cell, index) => {
   cell.addEventListener("click", () => {
     if (!isMyTurn || board[index]) return;
@@ -50,8 +50,9 @@ cells.forEach((cell, index) => {
   });
 });
 
-function updateUI() {
-  board.forEach((value, index) => {
-    cells[index].textContent = value || "";
+// Update the UI
+function updateBoardUI() {
+  board.forEach((val, i) => {
+    cells[i].textContent = val || "";
   });
 }
