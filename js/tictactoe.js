@@ -1,88 +1,73 @@
-// Connect to Socket.io server
-const socket = io("https://mini-games-backend.onrender.com");
+const socket = io("https://mini-games-backend.onrender.com"); // Replace with your Render backend URL
 
-// UI elements
-const statusText = document.getElementById("status");
-const boardCells = Array.from(document.querySelectorAll(".cell"));
-const roomInput = document.getElementById("roomInput");
-const joinBtn = document.getElementById("joinBtn");
+const boardDiv = document.getElementById("board");
+const turnDisplay = document.getElementById("turnDisplay");
+const roomDisplay = document.getElementById("roomDisplay");
 
-let roomId = null;
-let mySymbol = null;
 let myTurn = false;
+let mySymbol = null;
+let currentRoomId = null;
 
-// Join room button
-joinBtn.addEventListener("click", () => {
-  roomId = roomInput.value.trim();
-  if (!roomId) {
-    alert("Please enter a room ID");
-    return;
+function createRoom() {
+  socket.emit("createRoom");
+}
+
+function joinRoom() {
+  const roomId = document.getElementById("roomIdInput").value.trim();
+  if (roomId) {
+    socket.emit("joinRoom", { roomId });
   }
-  socket.emit("joinRoom", { roomId });
-  statusText.textContent = `Joined room: ${roomId}. Waiting for opponent...`;
+}
+
+socket.on("roomCreated", ({ roomId }) => {
+  roomDisplay.textContent = `Room ID: ${roomId}`;
 });
 
-// Listen for waiting message
-socket.on("waitingForOpponent", () => {
-  statusText.textContent = "Waiting for opponent to join...";
+socket.on("startGame", ({ symbol, turn, roomId }) => {
+  mySymbol = symbol;
+  myTurn = turn;
+  currentRoomId = roomId;
+  initBoard();
+  updateTurnDisplay();
 });
 
-// When game starts
-socket.on("startGame", ({ board, turn, symbols }) => {
-  mySymbol = symbols[socket.id];
-  myTurn = (turn === socket.id);
-  updateBoard(board);
-  updateStatus();
-});
-
-// Update board UI
 socket.on("updateBoard", ({ board, turn }) => {
   updateBoard(board);
-  myTurn = (turn === socket.id);
-  updateStatus();
+  myTurn = turn;
+  updateTurnDisplay();
 });
 
-// Game over event
-socket.on("gameOver", ({ winner, board }) => {
-  updateBoard(board);
-  if (winner === null) {
-    statusText.textContent = "Game Over! It's a draw.";
-  } else if (winner === socket.id) {
-    statusText.textContent = "Game Over! You win! 🎉";
-  } else {
-    statusText.textContent = "Game Over! You lose.";
+socket.on("opponentDisconnected", () => {
+  alert("Opponent disconnected");
+  location.reload();
+});
+
+function initBoard() {
+  boardDiv.innerHTML = "";
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.dataset.index = i;
+    cell.addEventListener("click", handleClick);
+    boardDiv.appendChild(cell);
   }
-  myTurn = false;
-});
+}
 
-// Room full
-socket.on("roomFull", () => {
-  alert("Room is full. Please try another room.");
-});
+function handleClick(e) {
+  if (!myTurn) return;
+  const index = e.target.dataset.index;
+  if (!e.target.textContent) {
+    socket.emit("makeMove", { roomId: currentRoomId, index });
+  }
+}
 
-// Handle clicking on cells
-boardCells.forEach((cell, idx) => {
-  cell.addEventListener("click", () => {
-    if (!myTurn) return;
-    if (cell.textContent !== "") return;
-    if (!roomId) return;
-
-    socket.emit("makeMove", { roomId, index: idx });
-  });
-});
-
-// Helper to update board UI
 function updateBoard(board) {
-  board.forEach((symbol, idx) => {
-    boardCells[idx].textContent = symbol || "";
+  const cells = boardDiv.querySelectorAll(".cell");
+  board.forEach((val, i) => {
+    cells[i].textContent = val;
   });
 }
 
-// Helper to update status text
-function updateStatus() {
-  if (myTurn) {
-    statusText.textContent = `Your turn (${mySymbol})`;
-  } else {
-    statusText.textContent = `Opponent's turn (${mySymbol === "X" ? "O" : "X"})`;
-  }
+function updateTurnDisplay() {
+  turnDisplay.textContent = myTurn ? "Your Turn" : "Opponent's Turn";
 }
