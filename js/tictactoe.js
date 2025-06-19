@@ -9,7 +9,7 @@ let mySymbol = null;
 let currentRoomId = null;
 
 function createRoom() {
-  socket.emit("createRoom");
+  socket.emit("createRoom", { game: "tictactoe" });
 }
 
 function joinRoom() {
